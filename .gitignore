@@ -16,3 +16,6 @@ notebooks/*
 
 pvrcnn/eval/*
 pvrcnn/core/viz_detections.py
+
+.vscode/*
+*.pyc
