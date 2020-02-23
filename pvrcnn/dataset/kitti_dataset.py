@@ -66,7 +66,7 @@ class KittiDataset(Dataset):
             return
         print('Generating annotations...')
         self.annotations = dict()
-        for idx in tqdm(self.inds):
+        for idx in tqdm(self.inds, desc='Generating_annotations'):
             self.annotations[idx] = self.create_annotation(idx, cfg)
         self.cache_annotations(cfg)
 

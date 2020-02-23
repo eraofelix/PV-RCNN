@@ -21,7 +21,7 @@ class DatabaseBuilder:
             return
         print('Building database...')
         database = defaultdict(list)
-        for item in tqdm.tqdm(annotations.values()):
+        for item in tqdm.tqdm(annotations.values(), desc='annotations_values'):
             for key, val in zip(*self._process_item(item)):
                 database[key] += [val]
         self._save_database(dict(database))

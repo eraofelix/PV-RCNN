@@ -6,7 +6,8 @@ from tqdm import tqdm
 from torch.utils.data import DataLoader
 
 from pvrcnn.detector import ProposalLoss
-from pvrcnn.core import cfg, TrainPreprocessor, VisdomLinePlotter
+from pvrcnn.core import cfg, TrainPreprocessor#, VisdomLinePlotter
+from torch.utils.tensorboard import SummaryWriter
 from pvrcnn.dataset import KittiDataset
 from pvrcnn.detector import PV_RCNN
 
@@ -51,14 +52,18 @@ def update_plot(losses, prefix):
 def train_model(model, dataloader, optimizer, loss_fn, epochs, start_epoch=0):
     model.train()
     for epoch in range(start_epoch, epochs):
-        for step, item in enumerate(tqdm(dataloader)):
+        for step, item in enumerate(dataloader):
             optimizer.zero_grad()
             out = model(item, proposals_only=True)
             losses = loss_fn(out)
             losses['loss'].backward()
             optimizer.step()
-            if (step % 50) == 0:
-                update_plot(losses, 'step')
+            print('epoch:{}, step:{}, loss:{}, cls_loss:{}, reg_loss:{}'.format(
+                epoch, step, losses['loss'].item(), losses['cls_loss'].item(), losses['reg_loss'].item()))
+            writer.add_scalar('Train/total_loss', losses['loss'].item(), epoch*dataloader.__len__()+step)
+            writer.add_scalar('Train/cls_loss', losses['cls_loss'].item(), epoch*dataloader.__len__()+step)
+            writer.add_scalar('Train/reg_loss', losses['reg_loss'].item(), epoch*dataloader.__len__()+step)
+            writer.flush()
         save_cpkt(model, optimizer, epoch)
 
 
@@ -82,7 +87,8 @@ def main():
 
 
 if __name__ == '__main__':
-    global plotter
-    plotter = VisdomLinePlotter(env='training')
+    # global plotter
+    # plotter = VisdomLinePlotter(env='training')
+    writer = SummaryWriter(os.path.expanduser('~/log/'))
     cfg.merge_from_file('../configs/all.yaml')
     main()
