@@ -53,6 +53,31 @@ class KittiDataset(Dataset):
             pickle.dump(self.annotations, f)
 
     def create_annotation(self, idx, cfg):
+        """create_annotation
+
+        data example:
+        
+        idx = 7
+        velo_path = '../data/kitti/training/velodyne_reduced/000007.bin'
+        calib = <pvrcnn.dataset.kitti_utils.Calibration object at 0x7fcc7da2e750>
+            calib.P   : 3x4, line P2 in txt
+            calib.C2V : 3x4, line Tr_velo_to_cam in txt
+            calib.V2C : 3x4, inverse_rigid_trans(C2V)
+            calib.R0  : 3x3, line R0_rect in txt
+        objects = [ <pvrcnn.dataset.kitti_utils.Object3d object at 0x7fcc7da87150>, 
+                    <pvrcnn.dataset.kitti_utils.Object3d object at 0x7fcc7d9f8950>, 
+                    <pvrcnn.dataset.kitti_utils.Object3d object at 0x7fcc7d9f89d0>, 
+                    <pvrcnn.dataset.kitti_utils.Object3d object at 0x7fcc7d9f8a90>, 
+                    <pvrcnn.dataset.kitti_utils.Object3d object at 0x7fcc7d9f8b10>, 
+                    <pvrcnn.dataset.kitti_utils.Object3d object at 0x7fcc7d9f8bd0>]
+            objects[i].h = data[8] # box height
+            objects[i].w = data[9] # box width
+            objects[i].l = data[10] # box length (in meters)
+            objects[i].t = (data[11], data[12] - self.h / 2, data[13]) # location (x,y,z) in camera coord.
+            objects[i].dis_to_cam = np.linalg.norm(self.t)
+            objects[i].ry = data[14] # yaw angle (around Y-axis in camera coordinates) [-pi..pi]
+
+        """
         velo_path = osp.join(cfg.DATA.ROOTDIR, 'velodyne_reduced', f'{idx:06d}.bin')
         calib = read_calib(osp.join(cfg.DATA.ROOTDIR, 'calib', f'{idx:06d}.txt'))
         objects = read_label(osp.join(cfg.DATA.ROOTDIR, 'label_2', f'{idx:06d}.txt'))
@@ -71,12 +96,20 @@ class KittiDataset(Dataset):
         self.cache_annotations(cfg)
 
     def make_simple_object(self, obj, calib):
-        """Convert coordinates to velodyne frame."""
-        xyz = calib.R0 @ obj.t
-        xyz = calib.C2V @ np.r_[xyz, 1]
-        wlh = np.r_[obj.w, obj.l, obj.h]
-        rz = np.r_[-obj.ry]
-        box = np.r_[xyz, wlh, rz]
+        """For each obs, convert coordinates to velodyne frame.
+        
+        Args:
+            obj ([type]): [description]
+            calib ([type]): [description]
+        
+        Returns:
+            [type]: [description]
+        """
+        xyz = calib.R0 @ obj.t              # (3,3)x(3,)=(3,), 
+        xyz = calib.C2V @ np.r_[xyz, 1]     # (3,4)x(4,)=(3,),array([-0.86744172,  0.78475468, 25.00782068]), where np.r_[xyz, 1]: [x,y,z] ==> [x,y,z,1], 
+        wlh = np.r_[obj.w, obj.l, obj.h]    # (3,), array([1.66, 3.2 , 1.61])， nothing changed???
+        rz = np.r_[-obj.ry]                 # (1,), array([1.59])
+        box = np.r_[xyz, wlh, rz]           # (7,), array([-0.86744172,  0.78475468, 25.00782068,  1.66,  3.2, 1.61,  1.59])
         obj = dict(box=box, class_idx=obj.class_idx)
         return obj
 
