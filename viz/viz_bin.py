@@ -48,7 +48,7 @@ class KittiViewer():
                         PointField('z', 8, PointField.FLOAT32, 1),
                         PointField('rgba', 12, PointField.FLOAT32, 1)]
         self.__header = Header()
-        self.__header.frame_id = "chassis_base"
+        self.__header.frame_id = "map"
         rospy.init_node('bin_publisher', anonymous=True)
 
     def __publish(self, idx):
@@ -111,29 +111,30 @@ class KittiViewer():
             pp1.z = pp2.z = pp3.z = pp4.z = obs.ObsPosition.z
             pp1.x = obs.ObsPosition.x - obs.Width/2.0 * np.sin(obs.ObsTheta) - obs.Length / 2.0 * np.cos(obs.ObsTheta)
             pp1.y = obs.ObsPosition.y + obs.Width/2.0 * np.cos(obs.ObsTheta) - obs.Length / 2.0 * np.sin(obs.ObsTheta)
-            # obs.PolygonPoints.append(pp1)
 
             pp2.x = obs.ObsPosition.x + obs.Width/2.0 * np.sin(obs.ObsTheta) - obs.Length / 2.0 * np.cos(obs.ObsTheta)
             pp2.y = obs.ObsPosition.y - obs.Width/2.0 * np.cos(obs.ObsTheta) - obs.Length / 2.0 * np.sin(obs.ObsTheta)
-            # obs.PolygonPoints.append(pp2)
 
             pp3.x = obs.ObsPosition.x + obs.Width/2.0 * np.sin(obs.ObsTheta) + obs.Length / 2.0 * np.cos(obs.ObsTheta)
             pp3.y = obs.ObsPosition.y - obs.Width/2.0 * np.cos(obs.ObsTheta) + obs.Length / 2.0 * np.sin(obs.ObsTheta)
-            # obs.PolygonPoints.append(pp3)
 
             pp4.x = obs.ObsPosition.x - obs.Width/2.0 * np.sin(obs.ObsTheta) + obs.Length / 2.0 * np.cos(obs.ObsTheta)
             pp4.y = obs.ObsPosition.y + obs.Width/2.0 * np.cos(obs.ObsTheta) + obs.Length / 2.0 * np.sin(obs.ObsTheta)
             obs.PolygonPoints += [pp1, pp2, pp3, pp4]
 
             obss.obs.append(obs)
-            
-        while not rospy.core.is_shutdown():
+
+        count = 0    
+        while count < 1:
             self.__bin_pub.publish(cloud)
             self.__obs_pub.publish(obss)
-            time.sleep(0.2)
+            time.sleep(0.5)
+            count += 1
 
     def run(self):
-        self.__publish(idx=1)
+        for idx in range(10000):
+            print('idx={}'.format(idx))
+            self.__publish(idx=idx)
 
 if __name__ == '__main__':
     root_path = '/home/kun.fan/codes/PV-RCNN/data/kitti/training'
