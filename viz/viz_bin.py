@@ -9,36 +9,10 @@ from sensor_msgs.msg import PointField
 from geometry_msgs.msg import Point
 from autodrive_msgs.msg import Obstacles, Obstacle
 from std_msgs.msg import Header
-from kitti_utils import *
+from kitti_utils import read_calib, read_label
+from pandar_utils import read_calib_pandar, make_simple_objects
 import time 
-
-
-def make_simple_object(obj, calib):
-    """For each obs, convert coordinates to velodyne frame.
-    
-    Args:
-        obj ([type]): [description]
-        calib ([type]): [description]
-    
-    Returns:
-        [type]: [description]
-    """
-    xyz = calib.R0 @ obj.t              # (3,3)x(3,)=(3,), 
-    xyz = calib.C2V @ np.r_[xyz, 1]     # (3,4)x(4,)=(3,),array([-0.86744172,  0.78475468, 25.00782068]), where np.r_[xyz, 1]: [x,y,z] ==> [x,y,z,1], 
-    wlh = np.r_[obj.w, obj.l, obj.h]    # (3,), array([1.66, 3.2 , 1.61])， nothing changed???
-    rz = np.r_[-obj.ry]                 # (1,), array([1.59])
-    box = np.r_[xyz, wlh, rz]           # (7,), array([-0.86744172,  0.78475468, 25.00782068,  1.66,  3.2, 1.61,  1.59])
-    obj = dict(box=box, class_idx=obj.class_idx)
-    return obj
-
-def make_simple_objects(item):
-    objects = [make_simple_object(
-        obj, item['calib']) for obj in item['objects']]
-    item['boxes'] = np.stack([obj['box'] for obj in objects])
-    item['class_idx'] = np.r_[[obj['class_idx'] for obj in objects]]
-
 class KittiViewer():
-
     def __init__(self, root_dir):
         self.__root_dir = root_dir
         self.__bin_pub = rospy.Publisher('/bin', PointCloud2, queue_size=2)
@@ -51,11 +25,17 @@ class KittiViewer():
         self.__header.frame_id = "map"
         rospy.init_node('bin_publisher', anonymous=True)
 
-    def __publish(self, idx):
-        velo_path = os.path.join(self.__root_dir, 'velodyne_reduced', f'{idx:06d}.bin')
-        calib = read_calib(os.path.join(self.__root_dir, 'calib', f'{idx:06d}.txt'))
-        objects = read_label(os.path.join(self.__root_dir, 'label_2', f'{idx:06d}.txt'))
-        item = dict(velo_path=velo_path, calib=calib, objects=objects, idx=idx)
+    def __publish(self, bin_name):
+        velo_path = os.path.join(self.__root_dir, 'velodyne_reduced', '{}.bin'.format(bin_name))
+        calib_path = os.path.join(self.__root_dir, 'calib', '{}.txt'.format(bin_name))
+        label_path = os.path.join(self.__root_dir, 'label_2', '{}.txt'.format(bin_name))
+        calib_lines = sum(1 for line in open(calib_path))
+        if calib_lines < 7:
+            calib = read_calib_pandar(calib_path)
+        else:
+            calib = read_calib(calib_path)
+        objects = read_label(label_path)
+        item = dict(velo_path=velo_path, calib=calib, objects=objects, idx=0)
         make_simple_objects(item)
         """item: dict
         {'velo_path': '/home/kun.fan/codes/PV-RCNN/data/kitti/training/velodyne_reduced/000007.bin', 
@@ -102,7 +82,7 @@ class KittiViewer():
             obs.ObsPosition.x = boxes[0]
             obs.ObsPosition.y = boxes[1]
             obs.ObsPosition.z = boxes[2]
-            obs.ObsTheta = boxes[6]
+            obs.ObsTheta = boxes[6] + np.pi / 2
             obs.Length = boxes[4]
             obs.Width = boxes[3]
             obs.Height = boxes[5]
@@ -125,16 +105,17 @@ class KittiViewer():
             obss.obs.append(obs)
 
         count = 0    
-        while count < 1:
+        while count < 1000:
             self.__bin_pub.publish(cloud)
             self.__obs_pub.publish(obss)
-            time.sleep(0.5)
+            time.sleep(5)
             count += 1
 
     def run(self):
-        for idx in range(10000):
-            print('idx={}'.format(idx))
-            self.__publish(idx=idx)
+        # bin_name = f'{idx:06d}.txt'
+        bin_name = '1543993063545'
+        print('bin_name={}'.format(bin_name))
+        self.__publish(bin_name=bin_name)
 
 if __name__ == '__main__':
     root_path = '/home/kun.fan/codes/PV-RCNN/data/kitti/training'
