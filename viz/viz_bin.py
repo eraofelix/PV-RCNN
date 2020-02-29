@@ -9,8 +9,9 @@ from sensor_msgs.msg import PointField
 from geometry_msgs.msg import Point
 from autodrive_msgs.msg import Obstacles, Obstacle
 from std_msgs.msg import Header
-from kitti_utils import read_calib, read_label
-from pandar_utils import read_calib_pandar, make_simple_objects
+sys.path.append(os.path.join(os.sep.join(os.path.abspath(__file__).split("/")[:-2]),''))
+from pvrcnn.dataset.kitti_utils import read_calib, read_label
+from pvrcnn.dataset.pandar_utils import read_calib_pandar, make_simple_objects
 import time 
 class KittiViewer():
     def __init__(self, root_dir):
@@ -113,7 +114,7 @@ class KittiViewer():
 
     def run(self):
         # bin_name = f'{idx:06d}.txt'
-        bin_name = '1543993063545'
+        bin_name = '1544429968359'
         print('bin_name={}'.format(bin_name))
         self.__publish(bin_name=bin_name)
 

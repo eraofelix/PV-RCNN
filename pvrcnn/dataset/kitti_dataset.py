@@ -4,10 +4,12 @@ import numpy as np
 import torch
 from copy import deepcopy
 import os.path as osp
+import os
 from torch.utils.data import Dataset
 
 from pvrcnn.core import ProposalTargetAssigner, AnchorGenerator
 from .kitti_utils import read_calib, read_label, read_velo
+from .pandar_utils import read_calib_pandar
 from .augmentation import ChainedAugmentation
 from .database_sampler import DatabaseBuilder
 
@@ -35,8 +37,12 @@ class KittiDataset(Dataset):
         return len(self.inds)
 
     def read_splitfile(self, cfg):
-        fpath = osp.join(cfg.DATA.SPLITDIR, f'{self.split}.txt')
-        self.inds = np.loadtxt(fpath, dtype=np.int32).tolist()
+        if cfg.DATA.DATASET == 'pandar':
+            bins_dir = osp.join(cfg.DATA.ROOTDIR, 'velodyne_reduced')
+            self.inds = [n[:-4] for n in os.listdir(bins_dir) if '.bin' in n]
+        else:  # kitti
+            fpath = osp.join(cfg.DATA.SPLITDIR, f'{self.split}.txt')
+            self.inds = np.loadtxt(fpath, dtype=np.int32).tolist()
 
     def try_read_cached_annotations(self, cfg):
         fpath = osp.join(cfg.DATA.CACHEDIR, f'{self.split}.pkl')
@@ -78,9 +84,14 @@ class KittiDataset(Dataset):
             objects[i].ry = data[14] # yaw angle (around Y-axis in camera coordinates) [-pi..pi]
 
         """
-        velo_path = osp.join(cfg.DATA.ROOTDIR, 'velodyne_reduced', f'{idx:06d}.bin')
-        calib = read_calib(osp.join(cfg.DATA.ROOTDIR, 'calib', f'{idx:06d}.txt'))
-        objects = read_label(osp.join(cfg.DATA.ROOTDIR, 'label_2', f'{idx:06d}.txt'))
+        if cfg.DATA.DATASET == 'pandar':
+            bin_name = idx
+            read_calib = read_calib_pandar
+        else:
+            bin_name = f'{idx:06d}'
+        velo_path = osp.join(cfg.DATA.ROOTDIR, 'velodyne_reduced', bin_name+'.bin')
+        calib = read_calib(osp.join(cfg.DATA.ROOTDIR, 'calib', bin_name+'.txt'))
+        objects = read_label(osp.join(cfg.DATA.ROOTDIR, 'label_2', bin_name+'.txt'))
         item = dict(velo_path=velo_path, calib=calib, objects=objects, idx=idx)
         self.make_simple_objects(item)
         return item
@@ -92,7 +103,10 @@ class KittiDataset(Dataset):
         print('Generating annotations...')
         self.annotations = dict()
         for idx in tqdm(self.inds, desc='Generating_annotations'):
-            self.annotations[idx] = self.create_annotation(idx, cfg)
+            try:  # in case no objects in label.txt
+                self.annotations[idx] = self.create_annotation(idx, cfg)
+            except Exception as e:
+                print(e)
         self.cache_annotations(cfg)
 
     def make_simple_object(self, obj, calib):

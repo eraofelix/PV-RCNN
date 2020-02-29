@@ -86,6 +86,7 @@ _C.DATA = CN()
 _C.DATA.CACHEDIR = '../data/cache/'
 _C.DATA.SPLITDIR = '../data/splitfiles/'
 _C.DATA.ROOTDIR = '../data/kitti/training/'
+_C.DATA.DATASET = 'pandar'
 
 # Train
 _C.TRAIN = CN()
