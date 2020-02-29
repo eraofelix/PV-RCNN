@@ -21,7 +21,7 @@ class DatabaseBuilder:
             return
         print('Building database...')
         database = defaultdict(list)
-        for item in tqdm.tqdm(annotations.values(), desc='annotations_values'):
+        for item in tqdm.tqdm(annotations.values(), desc='annotations_values'):  # 9102
             for key, val in zip(*self._process_item(item)):
                 database[key] += [val]
         self._save_database(dict(database))
@@ -37,9 +37,17 @@ class DatabaseBuilder:
         return _points, _boxes
 
     def _process_item(self, item):
-        """Retrieve points in each box in scene."""
-        points = read_velo(item['velo_path'])
-        class_idx, boxes = item['class_idx'], item['boxes']
+        """Retrieve points in each box in scene.
+        
+        Args:
+            item (dict): ['velo_path', 'calib', 'objects', 'idx', 'boxes', 'class_idx']
+
+        Returns:
+            [type]: [description]
+        """
+
+        points = read_velo(item['velo_path'])  # (-1, 4)
+        class_idx, boxes = item['class_idx'], item['boxes']  # (n, 1), (n, 7)
         points = PointsInCuboids(points)(boxes)
         keep = [len(p) > self.cfg.AUG.MIN_NUM_SAMPLE_PTS for p in points]
         class_idx, points, boxes = [

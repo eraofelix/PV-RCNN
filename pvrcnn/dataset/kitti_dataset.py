@@ -163,6 +163,8 @@ class KittiDataset(Dataset):
         self.target_assigner(item)
 
     def __getitem__(self, idx):
+        # len(inds)=9113, but len(annotations)=9102 due to empty label.txt
+        idx = idx if self.inds[idx] in self.annotations else 0
         item = deepcopy(self.annotations[self.inds[idx]])
         item['points'] = read_velo(item['velo_path'])
         if self.split == 'train':
