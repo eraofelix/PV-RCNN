@@ -8,22 +8,22 @@ from torch.utils.data import DataLoader
 from pvrcnn.detector import ProposalLoss
 from pvrcnn.core import cfg, TrainPreprocessor#, VisdomLinePlotter
 from torch.utils.tensorboard import SummaryWriter
-from pvrcnn.dataset import KittiDataset
+from pvrcnn.dataset import KittiDatasetTrain
 from pvrcnn.detector import PV_RCNN
 
 
 def build_train_dataloader(cfg, preprocessor):
-    dataset = KittiDataset(cfg, 'train')
     dataloader = DataLoader(
-        dataset,
+        KittiDatasetTrain(cfg),
         collate_fn=preprocessor.collate,
         batch_size=cfg.TRAIN.BATCH_SIZE,
+        num_workers=2,
     )
     return dataloader
 
 
 def save_cpkt(model, optimizer, epoch, meta=None):
-    fpath = f'./ckpts/epoch_{epoch}.pth'
+    fpath = f'./ckpts/epoch2_{epoch}.pth'
     ckpt = dict(
         state_dict=model.state_dict(),
         optimizer=optimizer.state_dict(),
@@ -49,20 +49,28 @@ def update_plot(losses, prefix):
         plotter.update(f'{prefix}_{key}', losses[key].item())
 
 
-def train_model(model, dataloader, optimizer, loss_fn, epochs, start_epoch=0):
+def to_device(item):
+    keys = ['G_cls', 'G_reg', 'M_cls', 'M_reg', 'points',
+        'features', 'coordinates', 'occupancy']
+    for key in keys:
+        item[key] = item[key].cuda()
+
+
+def train_model(model, dataloader, optimizer, lr_scheduler, loss_fn, epochs, start_epoch=0):
     model.train()
     for epoch in range(start_epoch, epochs):
-        for step, item in enumerate(dataloader):
+        for step, item in enumerate(tqdm(dataloader, desc=f'Epoch {epoch}')):
+            to_device(item)
             optimizer.zero_grad()
-            out = model(item, proposals_only=True)
+            out = model.proposal(item)
             losses = loss_fn(out)
             losses['loss'].backward()
             optimizer.step()
             print('epoch:{}, step:{}, loss:{}, cls_loss:{}, reg_loss:{}'.format(
                 epoch, step, losses['loss'].item(), losses['cls_loss'].item(), losses['reg_loss'].item()))
-            writer.add_scalar('Train/total_loss', losses['loss'].item(), epoch*dataloader.__len__()+step)
-            writer.add_scalar('Train/cls_loss', losses['cls_loss'].item(), epoch*dataloader.__len__()+step)
-            writer.add_scalar('Train/reg_loss', losses['reg_loss'].item(), epoch*dataloader.__len__()+step)
+            writer.add_scalar('Train2/total_loss', losses['loss'].item(), epoch*dataloader.__len__()+step)
+            writer.add_scalar('Train2/cls_loss', losses['cls_loss'].item(), epoch*dataloader.__len__()+step)
+            writer.add_scalar('Train2/reg_loss', losses['reg_loss'].item(), epoch*dataloader.__len__()+step)
             writer.flush()
         save_cpkt(model, optimizer, epoch)
 
@@ -76,19 +84,26 @@ def get_proposal_parameters(model):
 
 
 def main():
+    """TODO: Trainer class to manage objects."""
     model = PV_RCNN(cfg).cuda()
     loss_fn = ProposalLoss(cfg)
     preprocessor = TrainPreprocessor(cfg)
-    dataloader_train = build_train_dataloader(cfg, preprocessor)
+    dataloader = build_train_dataloader(cfg, preprocessor)
     parameters = get_proposal_parameters(model)
     optimizer = torch.optim.Adam(parameters, lr=cfg.TRAIN.LR)
-    start_epoch = load_ckpt('./ckpts/epoch_7.pth', model, optimizer)
-    train_model(model, dataloader_train, optimizer, loss_fn, cfg.TRAIN.EPOCHS, start_epoch)
+    scheduler = torch.optim.lr_scheduler.OneCycleLR(
+        optimizer, max_lr=3e-3, steps_per_epoch=len(dataloader), epochs=cfg.TRAIN.EPOCHS)
+    start_epoch = load_ckpt('./ckpts/epoch_100.pth', model, optimizer)
+    train_model(model, dataloader, optimizer, scheduler, loss_fn, cfg.TRAIN.EPOCHS, start_epoch)
 
+
+from multiprocessing import set_start_method
 
 if __name__ == '__main__':
-    # global plotter
-    # plotter = VisdomLinePlotter(env='training')
     writer = SummaryWriter(os.path.expanduser('~/log/'))
-    cfg.merge_from_file('../configs/all.yaml')
+    try:
+        set_start_method('spawn')
+    except RuntimeError:
+        pass
+    cfg.merge_from_file('../configs/car.yaml')
     main()

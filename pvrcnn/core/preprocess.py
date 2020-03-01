@@ -15,7 +15,6 @@ class Preprocessor(nn.Module):
         self.cfg = cfg
 
     def build_voxel_generator(self, cfg):
-        """Voxel-grid is reversed XYZ -> ZYX and padded in Z-axis."""
         voxel_generator = spconv.utils.VoxelGenerator(
             voxel_size=cfg.VOXEL_SIZE,
             point_cloud_range=cfg.GRID_BOUNDS,
@@ -25,7 +24,7 @@ class Preprocessor(nn.Module):
         return voxel_generator
 
     def generate_batch_voxels(self, points):
-        """Voxelize points and tag with batch index."""
+        """Voxelize points and prefix coordinates with batch index."""
         features, coordinates, occupancy = [], [], []
         for i, p in enumerate(points):
             f, c, o = self.voxel_generator.generate(p)
@@ -34,10 +33,8 @@ class Preprocessor(nn.Module):
         return map(np.concatenate, (features, coordinates, occupancy))
 
     def pad_for_batch(self, points: List) -> np.ndarray:
-        """
-        Pad with subsampled points to form dense minibatch.
-        :return np.ndarray of shape (B, N, C)
-        """
+        """Pad with subsampled points to form dense minibatch.
+        :return np.ndarray of shape (B, N, C)"""
         num_points = np.r_[[p.shape[0] for p in points]]
         pad = num_points.max() - num_points
         points_batch = []
@@ -47,48 +44,36 @@ class Preprocessor(nn.Module):
         points = np.stack(points_batch, axis=0)
         return points
 
-    def from_numpy(self, x):
-        """Make cuda tensor."""
-        return torch.from_numpy(x).cuda()
-
     def forward(self, item):
         """
-        Compute sparse voxel grid.
-        :points_in list of np.ndarrays of shape (Np, 4)
-        :points_out FloatTensor of shape (Np, 4)
-        :features FloatTensor of shape (Nv, 1)
-        :coordinates IntTensor of shape (Nv, 4)
+        Compute batch input from points.
+        :points_in length B list of np.ndarrays of shape (Np, 4)
+        :points_out FloatTensor of shape (B, Np, 4)
+        :features FloatTensor of shape (B * Nv, 1)
+        :coordinates IntTensor of shape (B * Nv, 4)
+        :occupancy LongTensor of shape (B * Nv, 4)
         """
         features, coordinates, occupancy = self.generate_batch_voxels(item['points'])
         points = self.pad_for_batch(item['points'])
-        keys = ['points', 'features', 'coordinates', 'occupancy']
-        vals = map(self.from_numpy, (points, features, coordinates, occupancy))
-        item.update(dict(zip(keys, vals)))
-        item['batch_size'] = len(points)
+        keys = ['points', 'features', 'coordinates', 'occupancy', 'batch_size']
+        vals = map(torch.from_numpy, (points, features, coordinates, occupancy))
+        item.update(dict(zip(keys, list(vals) + [len(points)])))
         return item
 
 
 class TrainPreprocessor(Preprocessor):
 
-    def __init__(self, cfg):
-        super(TrainPreprocessor, self).__init__(cfg)
-        self.cuda_keys = ['proposal_targets_cls', 'proposal_targets_reg']
-
     def collate_mapping(self, key, val):
-        if key in self.cuda_keys:
+        if key in ['G_cls', 'G_reg', 'M_cls', 'M_reg']:
             return torch.stack(val)
         return val
 
-    def device_mapping(self, key, val):
-        if key in self.cuda_keys:
-            return val.cuda()
-        return val
-
     def collate(self, items):
+        """Form batch item from list of items."""
         batch_item = defaultdict(list)
         for item in items:
             for key, val in item.items():
-                batch_item[key] += [self.device_mapping(key, val)]
+                batch_item[key] += [val]
         for key, val in batch_item.items():
             batch_item[key] = self.collate_mapping(key, val)
         return self(dict(batch_item))
