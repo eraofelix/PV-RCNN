@@ -80,6 +80,37 @@ class PV_RCNN(nn.Module):
         scores, boxes = self.proposal_layer(bev_map)
         item.update(dict(P_cls=scores, P_reg=boxes))
         return item
+        """
+        input item:['idx', 'boxes', 'class_idx', 'points', 'G_cls', 'G_reg', 
+                    'M_cls', 'M_reg', 'features', 'coordinates', 'occupancy', 'batch_size']
+
+        output item: dict()
+            idx: ['1543998917815', '1542877835047', '1544430249777', ...], len=8
+            boxes: [torch.Size([33, 7]), torch.Size([39, 7]), torch.Size([41, 7]), ...], len=8
+            class_idx: [torch.Size([33]), torch.Size([39]), torch.Size([41]), ...]], len=8
+            points: torch.Size([8, 145374, 4])
+            G_cls: torch.Size([8, 4, 2, 200, 176])
+            G_reg: torch.Size([8, 3, 2, 200, 176, 7])
+            M_cls: torch.Size([8, 1, 2, 200, 176])
+            M_reg: torch.Size([8, 3, 2, 200, 176, 1])
+            features: torch.Size([157606, 5, 4])
+            coordinates: torch.Size([157606, 4])
+            occupancy: torch.Size([157606])
+            batch_size: 8
+            keypoints: torch.Size([8, 2048, 3])       ==> new added 
+            P_cls: torch.Size([8, 4, 2, 200, 176])    ==> new added 
+            P_reg: torch.Size([8, 3, 2, 200, 176, 7]) ==> new added 
+
+        features: torch.Size([157606, 4])
+        bev_map: torch.Size([8, 128, 200, 176])
+        cnn_features:[tuple(a,b)*4]
+        [ (torch.Size([8, 20000, 3]), torch.Size([8, 20000, 4]))
+          (torch.Size([8, 46917, 3]), torch.Size([8, 46917, 32]))
+          (torch.Size([8, 37164, 3]), torch.Size([8, 37164, 64]))
+          (torch.Size([8, 16283, 3]), torch.Size([8, 16283, 64])) ]
+        scores: torch.Size([8, 4, 2, 200, 176])
+        boxes: torch.Size([8, 3, 2, 200, 176, 7])
+        """
 
     def forward(self, item):
         raise NotImplementedError

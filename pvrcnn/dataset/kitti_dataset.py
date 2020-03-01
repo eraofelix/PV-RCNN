@@ -113,8 +113,9 @@ class KittiDataset(Dataset):
         return obj
 
     def make_simple_objects(self, item):
-        objects = [self.make_simple_object(
-            obj, item['calib']) for obj in item['objects']]
+        # item: dict(velo_path=velo_path, calib=calib, objects=objects, idx=idx)
+        objects = [self.make_simple_object(obj, item['calib']) 
+            for obj in item['objects']]
         item['boxes'] = np.stack([obj['box'] for obj in objects])
         item['class_idx'] = np.r_[[obj['class_idx'] for obj in objects]]
         return item
@@ -146,13 +147,36 @@ class KittiDataset(Dataset):
         self.to_torch(item)
 
     def __getitem__(self, idx):
-        # len(inds)=9113, but len(annotations)=9102 due to empty label.txt
+        try:
+            return self.__getitem__core__(idx)
+        except Exception as e:
+            print('idx=', idx, e)
+            return self.__getitem__core__(0)
+
+    def __getitem__core__(self, idx):
         idx = idx if self.inds[idx] in self.annotations else 0
         item = deepcopy(self.annotations[self.inds[idx]])
         item['points'] = read_velo(item['velo_path'])
-        self.preprocessing(item)
+        self.preprocessing(item)  # excute preprocessing in KittiDatasetTrain!
         self.drop_keys(item)
         return item
+        """
+        self.annotations:dict, len=9102
+        self.annotations['1543993993737'].keys():
+        item.keys: ['velo_path', 'calib', 'objects', 'idx', 'boxes', 'class_idx']
+            |
+            |  ==> item['points'] = read_velo(item['velo_path'])
+            V
+        item.keys: ['velo_path', 'calib', 'objects', 'idx', 'boxes', 'class_idx', 'points']
+            |
+            |  ==> self.preprocessing(item), add: ['G_cls', 'G_reg', 'M_cls', 'M_reg']
+            V
+        item.keys: ['velo_path', 'calib', 'objects', 'idx', 'boxes', 'class_idx', 'points', 'G_cls', 'G_reg', 'M_cls', 'M_reg']
+            |
+            |  ==> self.drop_keys(item), drop: ['velo_path', 'calib', 'objects']
+            V
+        item.keys: ['idx', 'boxes', 'class_idx', 'points', 'G_cls', 'G_reg', 'M_cls', 'M_reg']
+        """
 
 
 class KittiDatasetTrain(KittiDataset):
@@ -161,7 +185,7 @@ class KittiDatasetTrain(KittiDataset):
 
     def __init__(self, cfg):
         super(KittiDatasetTrain, self).__init__(cfg, split='train')
-        anchors = AnchorGenerator(cfg).anchors
+        anchors = AnchorGenerator(cfg).anchors  # torch.Size([3, 2, 200, 176, 7])
         DatabaseBuilder(cfg, self.annotations)
         self.target_assigner = ProposalTargetAssigner(cfg, anchors)
         self.augmentation = ChainedAugmentation(cfg)
@@ -174,4 +198,9 @@ class KittiDatasetTrain(KittiDataset):
         item.update(dict(points=points, boxes=boxes, class_idx=class_idx))
         self.filter_out_of_bounds(item)
         self.to_torch(item)
-        self.target_assigner(item)
+        self.target_assigner(item)  # add ['G_cls', 'G_reg', 'M_cls', 'M_reg']
+        """
+        self.augmentation:
+            before aug: (133888, 4) (22, 7) (22,)
+            after aug: (149794, 4) (51, 7) (51,)
+        """

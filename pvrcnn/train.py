@@ -17,7 +17,7 @@ def build_train_dataloader(cfg, preprocessor):
         KittiDatasetTrain(cfg),
         collate_fn=preprocessor.collate,
         batch_size=cfg.TRAIN.BATCH_SIZE,
-        num_workers=2,
+        num_workers=3,
     )
     return dataloader
 
@@ -36,10 +36,12 @@ def save_cpkt(model, optimizer, epoch, meta=None):
 
 def load_ckpt(fpath, model, optimizer):
     if not osp.isfile(fpath):
+        print('{} not exist!'.format(fpath))
         return 0
     ckpt = torch.load(fpath)
     model.load_state_dict(ckpt['state_dict'])
     optimizer.load_state_dict(ckpt['optimizer'])
+    print('{} load done!'.format(fpath))
     epoch = ckpt['epoch']
     return epoch
 
@@ -93,7 +95,7 @@ def main():
     optimizer = torch.optim.Adam(parameters, lr=cfg.TRAIN.LR)
     scheduler = torch.optim.lr_scheduler.OneCycleLR(
         optimizer, max_lr=3e-3, steps_per_epoch=len(dataloader), epochs=cfg.TRAIN.EPOCHS)
-    start_epoch = load_ckpt('./ckpts/epoch_100.pth', model, optimizer)
+    start_epoch = load_ckpt('./ckpts/epoch2_20.pth', model, optimizer)
     train_model(model, dataloader, optimizer, scheduler, loss_fn, cfg.TRAIN.EPOCHS, start_epoch)
 
 
@@ -105,5 +107,5 @@ if __name__ == '__main__':
         set_start_method('spawn')
     except RuntimeError:
         pass
-    cfg.merge_from_file('../configs/car.yaml')
+    # cfg.merge_from_file('../configs/car.yaml')
     main()

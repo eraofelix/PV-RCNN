@@ -43,6 +43,11 @@ class AnchorGenerator(nn.Module):
         lower, upper = torch.tensor(self.cfg.GRID_BOUNDS).view(2, 3)[:, :2]
         grid_shape = ((upper - lower) / pixel_size).long()
         return lower, upper, grid_shape
+        """
+        pixel_size:  [0.4, 0.4]
+        lower, upper:  [[0, -40], [70.4, 40]]
+        grid_shape(nx, ny): (176, 200), where (70.4-0)/0.4=176 (40+40)/0.4=200 
+        """
 
     def make_anchor_sizes(self, nx, ny):
         num_yaw = self.anchor_attributes['yaw'].shape[1]
