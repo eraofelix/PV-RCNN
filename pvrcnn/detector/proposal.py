@@ -12,9 +12,9 @@ class ProposalLayer(nn.Module):
     def __init__(self, cfg):
         super(ProposalLayer, self).__init__()
         self.cfg = cfg
-        self.conv_cls = nn.Conv2d(  # nn.Conv2d(4, 8, 1)
+        self.conv_cls = nn.Conv2d(  # nn.Conv2d(4, 4, 1)
             cfg.PROPOSAL.C_IN, (cfg.NUM_CLASSES + 1) * cfg.NUM_YAW, 1)
-        self.conv_reg = nn.Conv2d(  # nn.Conv2d(4, 42, 1)
+        self.conv_reg = nn.Conv2d(  # nn.Conv2d(4, 14, 1)
             cfg.PROPOSAL.C_IN, cfg.NUM_CLASSES * cfg.NUM_YAW * cfg.BOX_DOF, 1)
         self._init_weights()
 

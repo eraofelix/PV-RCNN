@@ -23,7 +23,7 @@ def build_train_dataloader(cfg, preprocessor):
 
 
 def save_cpkt(model, optimizer, epoch, meta=None):
-    fpath = f'./ckpts/epoch2_{epoch}.pth'
+    fpath = f'./ckpts/epoch_{epoch}.pth'
     ckpt = dict(
         state_dict=model.state_dict(),
         optimizer=optimizer.state_dict(),
@@ -70,9 +70,9 @@ def train_model(model, dataloader, optimizer, lr_scheduler, loss_fn, epochs, sta
             optimizer.step()
             print('epoch:{}, step:{}, loss:{}, cls_loss:{}, reg_loss:{}'.format(
                 epoch, step, losses['loss'].item(), losses['cls_loss'].item(), losses['reg_loss'].item()))
-            writer.add_scalar('Train2/total_loss', losses['loss'].item(), epoch*dataloader.__len__()+step)
-            writer.add_scalar('Train2/cls_loss', losses['cls_loss'].item(), epoch*dataloader.__len__()+step)
-            writer.add_scalar('Train2/reg_loss', losses['reg_loss'].item(), epoch*dataloader.__len__()+step)
+            writer.add_scalar('Train_car/total_loss', losses['loss'].item(), epoch*dataloader.__len__()+step)
+            writer.add_scalar('Train_car/cls_loss', losses['cls_loss'].item(), epoch*dataloader.__len__()+step)
+            writer.add_scalar('Train_car/reg_loss', losses['reg_loss'].item(), epoch*dataloader.__len__()+step)
             writer.flush()
         save_cpkt(model, optimizer, epoch)
 
@@ -95,7 +95,7 @@ def main():
     optimizer = torch.optim.Adam(parameters, lr=cfg.TRAIN.LR)
     scheduler = torch.optim.lr_scheduler.OneCycleLR(
         optimizer, max_lr=3e-3, steps_per_epoch=len(dataloader), epochs=cfg.TRAIN.EPOCHS)
-    start_epoch = load_ckpt('./ckpts/epoch2_20.pth', model, optimizer)
+    start_epoch = load_ckpt('./ckpts/epoch_20.pth', model, optimizer)
     train_model(model, dataloader, optimizer, scheduler, loss_fn, cfg.TRAIN.EPOCHS, start_epoch)
 
 
@@ -107,5 +107,5 @@ if __name__ == '__main__':
         set_start_method('spawn')
     except RuntimeError:
         pass
-    # cfg.merge_from_file('../configs/car.yaml')
+    cfg.merge_from_file('../configs/car.yaml')
     main()
