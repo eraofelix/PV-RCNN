@@ -7,6 +7,7 @@ pythonpath.sh
 *.bin
 *.pth
 *.so
+*.pkl
 
 build/*
 dist/*
@@ -17,5 +18,9 @@ notebooks/*
 pvrcnn/eval/*
 pvrcnn/core/viz_detections.py
 
+<<<<<<< HEAD
 .vscode/*
 *.pyc
+=======
+images/proposals_*
+>>>>>>> ca40082be65531c03dfda7353f6eb2d6d47ebb64

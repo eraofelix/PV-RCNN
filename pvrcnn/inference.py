@@ -27,10 +27,8 @@ def get_topk(out, anchors, cfg):
     top_scores.sort()
     top_scores = top_scores[-cfg.PROPOSAL.TOPK:][::-1]
     anchor_idx = top_scores_copy.argsort()[-cfg.PROPOSAL.TOPK:][::-1]
-    # top_scores, anchor_idx = top_scores.topk(k=cfg.PROPOSAL.TOPK)  # 100
 
     top_anchors = anchors.reshape([cfg.NUM_CLASSES, -1, cfg.BOX_DOF])
-    # import pdb;pdb.set_trace()
     top_anchors = top_anchors[:, anchor_idx, :]
 
     top_boxes = reg_map.reshape([cfg.NUM_CLASSES, -1, cfg.BOX_DOF])
@@ -133,7 +131,7 @@ def main():
     with torch.no_grad():
         item = to_device(preprocessor(item))
         out = net.proposal(item)
-        top_boxes, top_scores= get_topk(out, anchors, cfg)
+        top_boxes, top_scores= inference(out, anchors, cfg)
         print('top_boxes:', top_boxes)
         print('top_scores', top_scores)
 

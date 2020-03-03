@@ -113,4 +113,4 @@ class PV_RCNN(nn.Module):
         """
 
     def forward(self, item):
-        raise NotImplementedError
+        raise self.proposal(proposal)
