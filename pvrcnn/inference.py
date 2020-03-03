@@ -17,13 +17,12 @@ def to_device(item):
 
 def get_topk(out, anchors, cfg):
     # tensor2numpy
-    # cls_map = out['P_cls'].cpu().numpy().squeeze(0)  # (2, 2, 200, 176) ???
-    cls_map = out['P_cls'].cpu().numpy()[:, 0, :, :, :]  # ???
+    cls_map = out['P_cls'].cpu().numpy().squeeze(0)  # (2, 2, 200, 176) (NUM_CLASSES+1, NUM_YAW, ny, nx)
     reg_map = out['P_reg'].cpu().numpy().squeeze(0)  # (1, 2, 200, 176, 7)
     anchors = anchors.cpu().numpy()       # (1, 2, 200, 176, 7)
-    score_map = 1/(1+np.exp(-cls_map))
+    score_map = 1/(1+np.exp(-cls_map))  # along cls dim!!!
 
-    top_scores = score_map.reshape([cfg.NUM_CLASSES, -1]).max(0)
+    top_scores = score_map.reshape([cfg.NUM_CLASSES+1, -1]).max(0)
     top_scores_copy = copy.deepcopy(top_scores)
     top_scores.sort()
     top_scores = top_scores[-cfg.PROPOSAL.TOPK:][::-1]
@@ -52,10 +51,9 @@ def get_topk(out, anchors, cfg):
     top_boxes = torch.from_numpy(top_boxes).float().cuda()
 
     # [0, 1, 3, 4, 6] ==>[x, y, w, l, yaw]
-    nms_idx = nms_rotated(top_boxes[:, [0, 1, 3, 4, 6]], top_scores, iou_threshold=0.01)
+    nms_idx = nms_rotated(top_boxes[:, [0, 1, 3, 4, 6]], top_scores, iou_threshold=0.2)
     top_boxes = top_boxes[nms_idx]
     top_scores = top_scores[nms_idx]
-    import pdb;pdb.set_trace()
     return top_boxes, top_scores
 
 def inference_my(out, anchors, cfg):  # anchors: torch.Size([1, 2, 200, 176, 7])
@@ -98,6 +96,7 @@ def inference(out, anchors, cfg):
     top_scores, class_idx = score_map.view(cfg.NUM_CLASSES, -1).max(0)
     top_scores, anchor_idx = top_scores.topk(k=cfg.PROPOSAL.TOPK)
     class_idx = class_idx[anchor_idx]
+    import pdb;pdb.set_trace()
     top_anchors = anchors.view(cfg.NUM_CLASSES, -1, cfg.BOX_DOF)[class_idx, anchor_idx]
     top_boxes = reg_map.reshape(cfg.NUM_CLASSES, -1, cfg.BOX_DOF)[class_idx, anchor_idx]
 
@@ -118,24 +117,25 @@ def inference(out, anchors, cfg):
     top_boxes = top_boxes[nms_idx]
     top_scores = top_scores[nms_idx]
     top_classes = class_idx[nms_idx]
-    return top_boxes, top_scores, 
+    return top_boxes, top_scores
 
 def main():
     cfg.merge_from_file('../configs/car.yaml')
     preprocessor = Preprocessor(cfg)
     anchors = AnchorGenerator(cfg).anchors.cuda()
     net = PV_RCNN(cfg).cuda().eval()
-    ckpt = torch.load('./ckpts/epoch_10.pth')
+    ckpt = torch.load('./ckpts/epoch_30.pth')
     net.load_state_dict(ckpt['state_dict'])
     basedir = osp.join(cfg.DATA.ROOTDIR, 'velodyne_reduced/')
     item = dict(points=[
-        np.fromfile(osp.join(basedir, '1544505305505.bin'), np.float32).reshape(-1, 4),
+        np.fromfile(osp.join(basedir, '1544426448586.bin'), np.float32).reshape(-1, 4),
     ])
     with torch.no_grad():
         item = to_device(preprocessor(item))
         out = net.proposal(item)
         top_boxes, top_scores= get_topk(out, anchors, cfg)
-        print('done')
+        print('top_boxes:', top_boxes)
+        print('top_scores', top_scores)
 
 
 if __name__ == '__main__':

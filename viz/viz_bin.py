@@ -18,6 +18,7 @@ class KittiViewer():
         self.__root_dir = root_dir
         self.__bin_pub = rospy.Publisher('/bin', PointCloud2, queue_size=2)
         self.__obs_pub = rospy.Publisher('/gt', Obstacles, queue_size=10)
+        self.__obs_pred_pub = rospy.Publisher('/pred', Obstacles, queue_size=10)
         self.__fields = [PointField('x', 0, PointField.FLOAT32, 1),
                         PointField('y', 4, PointField.FLOAT32, 1),
                         PointField('z', 8, PointField.FLOAT32, 1),
@@ -105,16 +106,54 @@ class KittiViewer():
 
             obss.obs.append(obs)
 
+        obss_pred = Obstacles()
+        obss_pred.header = self.__header
+        pred_boxes = np.array([[ 7.6149, -3.6703, -1.9668,  1.7707,  4.6234,  1.7978,  3.1490],
+        [10.4535, -4.3391, -1.6602,  1.6664,  4.5384,  1.6404,  2.5522],
+        [ 9.2430, -3.9556, -1.7602,  1.7009,  4.5118,  1.6653,  2.0695],
+        [ 8.4391, -1.8341, -1.8057,  1.7468,  4.5431,  1.7306,  3.4417],
+        [ 7.6652,  4.7613, -1.3137,  1.7320,  4.6263,  1.9815,  1.8110]])
+        for i in range(pred_boxes.shape[0]):
+            boxes = pred_boxes[i]
+            obs = Obstacle()
+            obs.header = self.__header
+            obs.ObsId = i
+            obs.ObsPosition.x = boxes[0]
+            obs.ObsPosition.y = boxes[1]
+            obs.ObsPosition.z = boxes[2]
+            obs.ObsTheta = boxes[6] + np.pi / 2
+            obs.Length = boxes[4]
+            obs.Width = boxes[3]
+            obs.Height = boxes[5]
+
+            pp1, pp2, pp3, pp4 = Point(), Point(), Point(), Point()
+            pp1.z = pp2.z = pp3.z = pp4.z = obs.ObsPosition.z
+            pp1.x = obs.ObsPosition.x - obs.Width/2.0 * np.sin(obs.ObsTheta) - obs.Length / 2.0 * np.cos(obs.ObsTheta)
+            pp1.y = obs.ObsPosition.y + obs.Width/2.0 * np.cos(obs.ObsTheta) - obs.Length / 2.0 * np.sin(obs.ObsTheta)
+
+            pp2.x = obs.ObsPosition.x + obs.Width/2.0 * np.sin(obs.ObsTheta) - obs.Length / 2.0 * np.cos(obs.ObsTheta)
+            pp2.y = obs.ObsPosition.y - obs.Width/2.0 * np.cos(obs.ObsTheta) - obs.Length / 2.0 * np.sin(obs.ObsTheta)
+
+            pp3.x = obs.ObsPosition.x + obs.Width/2.0 * np.sin(obs.ObsTheta) + obs.Length / 2.0 * np.cos(obs.ObsTheta)
+            pp3.y = obs.ObsPosition.y - obs.Width/2.0 * np.cos(obs.ObsTheta) + obs.Length / 2.0 * np.sin(obs.ObsTheta)
+
+            pp4.x = obs.ObsPosition.x - obs.Width/2.0 * np.sin(obs.ObsTheta) + obs.Length / 2.0 * np.cos(obs.ObsTheta)
+            pp4.y = obs.ObsPosition.y + obs.Width/2.0 * np.cos(obs.ObsTheta) + obs.Length / 2.0 * np.sin(obs.ObsTheta)
+            obs.PolygonPoints += [pp1, pp2, pp3, pp4]
+
+            obss_pred.obs.append(obs)
+
         count = 0    
         while count < 1000:
             self.__bin_pub.publish(cloud)
             self.__obs_pub.publish(obss)
-            time.sleep(5)
+            self.__obs_pred_pub.publish(obss_pred)
+            time.sleep(1)
             count += 1
 
     def run(self):
         # bin_name = f'{idx:06d}.txt'
-        bin_name = '1544429968359'
+        bin_name = '1544426448586'
         print('bin_name={}'.format(bin_name))
         self.__publish(bin_name=bin_name)
 
