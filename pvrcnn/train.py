@@ -88,8 +88,8 @@ def get_proposal_parameters(model):
 
 def main():
     """TODO: Trainer class to manage objects."""
-    model = Second(cfg).cuda()
-    # model = PV_RCNN(cfg).cuda()
+    # model = Second(cfg).cuda()
+    model = PV_RCNN(cfg).cuda()
     parameters = model.parameters()
     loss_fn = ProposalLoss(cfg)
     preprocessor = TrainPreprocessor(cfg)

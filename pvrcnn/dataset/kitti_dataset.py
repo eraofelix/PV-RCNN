@@ -8,7 +8,7 @@ import os.path as osp
 import os
 from torch.utils.data import Dataset
 
-from pvrcnn.core import ProposalTargetAssigner, AnchorGenerator
+from pvrcnn.core import ProposalTargetAssigner
 from .kitti_utils import read_calib, read_label, read_velo
 from .pandar_utils import read_calib_pandar
 from .augmentation import ChainedAugmentation
@@ -136,11 +136,13 @@ class KittiDataset(Dataset):
         keep = ((xyz >= lower) & (xyz <= upper)).all(1)
         item['boxes'] = item['boxes'][keep]
         item['class_idx'] = item['class_idx'][keep]
+        item['box_ignore'] = np.full(keep.sum(), False)
 
     def to_torch(self, item):
         item['points'] = np.float32(item['points'])
         item['boxes'] = torch.FloatTensor(item['boxes'])
         item['class_idx'] = torch.LongTensor(item['class_idx'])
+        item['box_ignore'] = torch.BoolTensor(item['box_ignore'])
 
     def drop_keys(self, item):
         for key in ['velo_path', 'objects', 'calib']:
@@ -188,10 +190,9 @@ class KittiDatasetTrain(KittiDataset):
 
     def __init__(self, cfg):
         super(KittiDatasetTrain, self).__init__(cfg, split='train')
-        anchors = AnchorGenerator(cfg).anchors  # torch.Size([3, 2, 200, 176, 7])
         DatabaseBuilder(cfg, self.annotations)
         self.augmentation = ChainedAugmentation(cfg)
-        self.target_assigner = ProposalTargetAssigner(cfg, anchors)
+        self.target_assigner = ProposalTargetAssigner(cfg)
 
     def preprocessing(self, item):
         """Applies augmentation and assigns targets."""
