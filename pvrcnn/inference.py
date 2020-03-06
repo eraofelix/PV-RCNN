@@ -1,12 +1,18 @@
+import copy
 import os
 import os.path as osp
 import numpy as np
 import torch
+import sys
+sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
+sys.path.append('/opt/ros/kinetic/lib/python2.7/dist-packages')
+import cv2
 from pvrcnn.core import cfg, Preprocessor
 from pvrcnn.detector import PV_RCNN, Second
 from pvrcnn.ops import nms_rotated, box_iou_rotated
 from pvrcnn.core import cfg, AnchorGenerator
-import copy
+from viz.gen_bev import gen_bev_map, draw_bev_box
+
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
 
@@ -50,18 +56,20 @@ def main():
     anchors = AnchorGenerator(cfg).anchors.cuda()
     net = PV_RCNN(cfg).cuda().eval()
     # net = Second(cfg).cuda().eval()
-    ckpt = torch.load('./ckpts/epoch_0.pth')
+    ckpt = torch.load('./ckpts/epoch_23.pth')
     net.load_state_dict(ckpt['state_dict'])
     basedir = osp.join(cfg.DATA.ROOTDIR, 'velodyne_reduced/')
-    item = dict(points=[
-        np.fromfile(osp.join(basedir, '1544426448586.bin'), np.float32).reshape(-1, 4),
-    ])
+    pc = np.fromfile(osp.join(basedir, '1544426448586.bin'), np.float32).reshape(-1, 4)
+    item = dict(points=[pc])
     with torch.no_grad():
         item = to_device(preprocessor(item))
         out = net(item)
         top_boxes, top_scores= inference(out, anchors, cfg)
-        print('top_boxes:', top_boxes)
-        print('top_scores', top_scores)
+
+        rgb = draw_bev_box(pc, top_boxes.cpu().numpy())
+
+        cv2.imshow('rgb', rgb)
+        cv2.waitKey(0)
 
 
 if __name__ == '__main__':

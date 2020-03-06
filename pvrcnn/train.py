@@ -98,7 +98,7 @@ def main():
     optimizer = torch.optim.Adam(parameters, lr=cfg.TRAIN.LR)
     scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=0.01,
         steps_per_epoch=len(dataloader), epochs=cfg.TRAIN.EPOCHS)
-    start_epoch = load_ckpt('./ckpts/epoch_20.pth', model, optimizer)
+    start_epoch = load_ckpt('./ckpts/epoch_23.pth', model, optimizer)
     train_model(model, dataloader, optimizer, scheduler, loss_fn, cfg.TRAIN.EPOCHS, start_epoch)
 
 
