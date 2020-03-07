@@ -7,6 +7,8 @@ import sys
 sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
 sys.path.append('/opt/ros/kinetic/lib/python2.7/dist-packages')
 import cv2
+from tqdm import tqdm
+import time
 from pvrcnn.core import cfg, Preprocessor
 from pvrcnn.detector import PV_RCNN, Second
 from pvrcnn.ops import nms_rotated, box_iou_rotated
@@ -50,27 +52,49 @@ def inference(out, anchors, cfg):
     top_classes = class_idx[nms_idx]
     return top_boxes, top_scores
 
-def main():
-    cfg.merge_from_file('../configs/second/car.yaml')
-    preprocessor = Preprocessor(cfg)
-    anchors = AnchorGenerator(cfg).anchors.cuda()
-    net = PV_RCNN(cfg).cuda().eval()
-    # net = Second(cfg).cuda().eval()
-    ckpt = torch.load('./ckpts/epoch_23.pth')
-    net.load_state_dict(ckpt['state_dict'])
-    basedir = osp.join(cfg.DATA.ROOTDIR, 'velodyne_reduced/')
-    pc = np.fromfile(osp.join(basedir, '1544426448586.bin'), np.float32).reshape(-1, 4)
-    item = dict(points=[pc])
-    with torch.no_grad():
-        item = to_device(preprocessor(item))
-        out = net(item)
-        top_boxes, top_scores= inference(out, anchors, cfg)
 
-        rgb = draw_bev_box(pc, top_boxes.cpu().numpy())
+class Inference():
+    def __init__(self,):
+        self.cfg = cfg
+        self.cfg.merge_from_file('../configs/second/car.yaml')
+        self.preprocessor = Preprocessor(cfg)
+        self.anchors = AnchorGenerator(cfg).anchors.cuda()
+        self.net = PV_RCNN(cfg).cuda().eval()
+        # self.net = Second(cfg).cuda().eval()
+        ckpt = torch.load('./ckpts/epoch_49.pth')
+        self.net.load_state_dict(ckpt['state_dict'])
+        pass
 
-        cv2.imshow('rgb', rgb)
-        cv2.waitKey(0)
+    def inference_bin_to_img(self, bin_path):
+        pc = np.fromfile(bin_path, np.float32).reshape(-1, 4)
+        item = dict(points=[pc])
+        with torch.no_grad():
+            item = to_device(self.preprocessor(item))
+            out = self.net(item)
+            top_boxes, top_scores= inference(out, self.anchors, self.cfg)
+            rgb = draw_bev_box(pc, top_boxes.cpu().numpy())
+        return rgb
+
+    def inference_bins_to_video(self, bins_dir, vid_path):
+        writer = cv2.VideoWriter(vid_path, cv2.VideoWriter_fourcc(*'MJPG'), 10, (2000,1000))
+        bin_names = os.listdir(bins_dir)
+        bin_names.sort()
+        bin_paths = [os.path.join(bins_dir, p) for p in bin_names if '.bin' in p]
+        for bin_path in tqdm(bin_paths[:200]):
+            rgb = self.inference_bin_to_img(bin_path).astype(np.uint8)
+            writer.write(rgb)
+
 
 
 if __name__ == '__main__':
-    main()
+    
+    basedir = osp.join(cfg.DATA.ROOTDIR, 'velodyne_reduced/')
+    bin_path = osp.join(basedir, '1544426448586.bin')
+    bins_dir = '/home/kun.fan/mnt/output/lidar_baseline_20200228/20200227-154819_262'
+    png_path = os.path.expanduser('~/mnt/output/1544426448586.png')
+    vid_path = os.path.expanduser('~/mnt/output/test.avi')
+
+    infer = Inference()
+    rgb = infer.inference_bin_to_img(bin_path)
+    cv2.imwrite(png_path, rgb)
+    infer.inference_bins_to_video(bins_dir, vid_path)

@@ -108,5 +108,5 @@ if __name__ == '__main__':
         multiprocessing.set_start_method('spawn')
     except RuntimeError:
         pass
-    cfg.merge_from_file('../configs/second/car.yaml')
+    cfg.merge_from_file('../configs/second/car_back.yaml')
     main()

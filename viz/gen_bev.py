@@ -109,18 +109,13 @@ def draw_bev_box(pc, boxes):
     im, rgb, _ = gen_bev_map(pc)
     h, w = im.shape
     scale = h / 100
-    print(im.shape, h, w)
     for box in boxes:
         points = (xyzwlht_to_polygonpoints(box)*scale).astype(np.int32)
-        print(xyzwlht_to_polygonpoints(box))
-        # example: [[13.01  3.59][12.90  5.34][ 8.61  5.08][ 8.72  3.33]]
-        cv2.rectangle(rgb,
-                      (points[1, 0]+w//2, h//2-points[1, 1]),
-                      (points[3, 0]+w//2, h//2-points[3, 1]),
-                      (0, 225, 0), 2)
+        points[:, 0] = points[:, 0] + w//2
+        points[:, 1] = h//2 - points[:, 1]
+        cv2.polylines(rgb, np.int32([points]), 1, (0,255,0))
+
     return rgb
-    # cv2.imshow('rgb', rgb)
-    # cv2.waitKey(0)
 
 
 if __name__ == '__main__':
